@@ -31,6 +31,9 @@ module Delayed
         opts.on('-n', '--number_of_workers=workers', "Number of unique workers to spawn") do |worker_count|
           @worker_count = worker_count.to_i rescue 1
         end
+        opts.on('-q', '--queue=queue_name', "The name of the queue for the workers to pull work from") do |queue|
+          @options[:queue] = queue
+        end
       end
       @args = opts.parse!(args)
     end
