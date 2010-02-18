@@ -4,6 +4,9 @@ describe Delayed::Worker do
   def job_create(opts = {})
     Delayed::Job.create(opts.merge(:payload_object => SimpleJob.new))
   end
+  def worker_create(opts = {})
+    Delayed::Worker.new(opts.merge(:max_priority => nil, :min_priority => nil, :quiet => true))
+  end
 
   before(:all) do
     Delayed::Worker.send :public, :work_off
@@ -13,7 +16,7 @@ describe Delayed::Worker do
     # Make sure backend is set to active record
     Delayed::Worker.backend = :active_record
     
-    @worker = Delayed::Worker.new(:max_priority => nil, :min_priority => nil, :quiet => true)
+    @worker = worker_create
 
     Delayed::Job.delete_all
     
@@ -173,6 +176,43 @@ describe Delayed::Worker do
       
     end
   end
-  
-  
+
+
+  context "Different queue workers" do
+    before :each do
+      job_create(:queue => 'queue1')
+      job_create(:queue => 'queue2')
+      job_create(:queue => nil)
+    end
+
+    it "should only work off jobs assigned to themselves" do
+      worker = worker_create(:queue=>'queue1')
+      SimpleJob.runs.should == 0
+      worker.work_off
+      SimpleJob.runs.should == 1
+      
+      SimpleJob.runs = 0
+
+      worker = worker_create(:queue=>'queue2')
+      SimpleJob.runs.should == 0
+      worker.work_off
+      SimpleJob.runs.should == 1
+    end
+
+    it "should not work off jobs not assigned to themselves" do
+      worker = worker_create(:queue=>'queue3')
+
+      SimpleJob.runs.should == 0
+      worker.work_off
+      SimpleJob.runs.should == 0
+    end
+
+    it "should run non-named runner jobs when the runner has no name set" do
+      worker = worker_create(:queue=>nil)
+
+      SimpleJob.runs.should == 0
+      worker.work_off
+      SimpleJob.runs.should == 1
+    end
+  end
 end

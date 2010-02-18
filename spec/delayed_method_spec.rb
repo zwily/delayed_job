@@ -15,8 +15,16 @@ describe 'random ruby objects' do
     lambda { Object.new.send_later(:to_s) }.should change { Delayed::Job.count }.by(1)
   end
 
+  it "should add a new entry to the job table when send_later_with_queue is called on it" do
+    lambda { Object.new.send_later_with_queue(:to_s, "testqueue") }.should change { Delayed::Job.count }.by(1)
+  end
+
   it "should add a new entry to the job table when send_later is called on the class" do
     lambda { Object.send_later(:to_s) }.should change { Delayed::Job.count }.by(1)
+  end
+
+  it "should add a new entry to the job table when send_later_with_queue is called on the class" do
+    lambda { Object.send_later_with_queue(:to_s, "testqueue") }.should change { Delayed::Job.count }.by(1)
   end
 
   it "should call send later on methods which are wrapped with handle_asynchronously" do
@@ -30,6 +38,21 @@ describe 'random ruby objects' do
     job =  Delayed::Job.find(:first)
     job.payload_object.class.should   == Delayed::PerformableMethod
     job.payload_object.method.should  == :whatever_without_send_later
+    job.payload_object.args.should    == [1, 5]
+    job.payload_object.perform.should == 'Once upon...'
+  end
+
+  it "should call send later on methods which are wrapped with handle_asynchronously_with_queue" do
+    story = Story.create :text => 'Once upon...'
+  
+    Delayed::Job.count.should == 0
+  
+    story.whatever_else(1, 5)
+  
+    Delayed::Job.count.should == 1
+    job =  Delayed::Job.find(:first)
+    job.payload_object.class.should   == Delayed::PerformableMethod
+    job.payload_object.method.should  == :whatever_else_without_send_later_with_queue
     job.payload_object.args.should    == [1, 5]
     job.payload_object.perform.should == 'Once upon...'
   end
@@ -49,6 +72,28 @@ describe 'random ruby objects' do
     
     it "should store payload as PerformableMethod" do
       job = "string".send_at(1.hour.from_now, :count, 'r')
+      job.payload_object.class.should   == Delayed::PerformableMethod
+      job.payload_object.method.should  == :count
+      job.payload_object.args.should    == ['r']
+      job.payload_object.perform.should == 1
+    end
+  end
+
+  context "send_at_with_queue" do
+    it "should queue a new job" do
+      lambda do
+        "string".send_at_with_queue(1.hour.from_now, :length, "testqueue")
+      end.should change { Delayed::Job.count }.by(1)
+    end
+    
+    it "should schedule the job in the future" do
+      time = 1.hour.from_now
+      job = "string".send_at_with_queue(time, :length, "testqueue")
+      job.run_at.should == time
+    end
+    
+    it "should store payload as PerformableMethod" do
+      job = "string".send_at_with_queue(1.hour.from_now, :count, "testqueue", 'r')
       job.payload_object.class.should   == Delayed::PerformableMethod
       job.payload_object.method.should  == :count
       job.payload_object.args.should    == ['r']

@@ -26,13 +26,13 @@ shared_examples_for 'a backend' do
   end
   
   it "should be able to set priority when enqueuing items" do
-    @job = @backend.enqueue SimpleJob.new, 5
+    @job = @backend.enqueue SimpleJob.new, :priority => 5
     @job.priority.should == 5
   end
 
   it "should be able to set run_at when enqueuing items" do
     later = @backend.db_time_now + 5.minutes
-    @job = @backend.enqueue SimpleJob.new, 5, later
+    @job = @backend.enqueue SimpleJob.new, :priority => 5, :run_at => later
     @job.run_at.should be_close(later, 1)
   end
 
@@ -183,7 +183,7 @@ shared_examples_for 'a backend' do
     end
 
     it "should fetch jobs ordered by priority" do
-      10.times { @backend.enqueue SimpleJob.new, rand(10) }
+      10.times { @backend.enqueue SimpleJob.new, :priority => rand(10) }
       jobs = @backend.find_available('worker', 10)
       jobs.size.should == 10
       jobs.each_cons(2) do |a, b| 

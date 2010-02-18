@@ -34,10 +34,12 @@ module Delayed
         end
 
         # Find a few candidate jobs to run (in case some immediately get locked by others).
-        def self.find_available(worker_name, limit = 5, max_run_time = Worker.max_run_time)
+        def self.find_available(worker_name, limit = 5, max_run_time = Worker.max_run_time, queue=nil)
           scope = self.ready_to_run(worker_name, max_run_time)
           scope = scope.scoped(:conditions => ['priority >= ?', Worker.min_priority]) if Worker.min_priority
           scope = scope.scoped(:conditions => ['priority <= ?', Worker.max_priority]) if Worker.max_priority
+          scope = scope.scoped(:conditions => ['queue = ?', queue]) if queue
+          scope = scope.scoped(:conditions => ['queue is null']) unless queue
       
           ::ActiveRecord::Base.silence do
             scope.by_priority.all(:limit => limit)

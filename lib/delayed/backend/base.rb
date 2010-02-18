@@ -10,15 +10,21 @@ module Delayed
       
       module ClassMethods
         # Add a job to the queue
+        # The first argument should be an object that respond_to?(:perform)
+        # The rest should be named arguments, these keys are expected:
+        # :priority, :run_at, :queue
+        # Example: Delayed::Job.enqueue(object, :priority => 0, :run_at => time, :queue => queue)
         def enqueue(*args)
           object = args.shift
           unless object.respond_to?(:perform)
             raise ArgumentError, 'Cannot enqueue items which do not respond to perform'
           end
     
-          priority = args.first || 0
-          run_at   = args[1]
-          self.create(:payload_object => object, :priority => priority.to_i, :run_at => run_at)
+          options = args.first || {}
+          options[:priority] ||= 0
+          options[:payload_object] = object
+          
+          self.create(options)
         end
       end
       

@@ -2,10 +2,11 @@ require 'timeout'
 
 module Delayed
   class Worker
-    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :logger
+    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :logger, :queue
     self.sleep_delay = 5
     self.max_attempts = 25
     self.max_run_time = 4.hours
+    self.queue = nil
     
     # By default failed jobs are destroyed after too many attempts. If you want to keep them around
     # (perhaps to inspect the reason for the failure), set this to false.
@@ -34,6 +35,7 @@ module Delayed
 
     def initialize(options={})
       @quiet = options[:quiet]
+      @queue = options[:queue]
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
       self.class.max_priority = options[:max_priority] if options.has_key?(:max_priority)
     end
@@ -149,7 +151,7 @@ module Delayed
 
       # We get up to 5 jobs from the db. In case we cannot get exclusive access to a job we try the next.
       # this leads to a more even distribution of jobs across the worker processes
-      job = Delayed::Job.find_available(name, 5, self.class.max_run_time).detect do |job|
+      job = Delayed::Job.find_available(name, 5, self.class.max_run_time, @queue).detect do |job|
         if job.lock_exclusively!(self.class.max_run_time, name)
           say "* [Worker(#{name})] acquired lock on #{job.name}"
           true

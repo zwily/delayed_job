@@ -17,6 +17,7 @@ ActiveRecord::Schema.define do
     table.integer  :priority, :default => 0
     table.integer  :attempts, :default => 0
     table.text     :handler
+    table.text     :queue, :default => nil
     table.string   :last_error
     table.datetime :run_at
     table.datetime :locked_at
@@ -35,8 +36,10 @@ end
 class Story < ActiveRecord::Base
   def tell; text; end       
   def whatever(n, _); tell*n; end
+  def whatever_else(n, _); tell*n; end
   
   handle_asynchronously :whatever
+  handle_asynchronously_with_queue :whatever_else, "testqueue"
 end
 
 require 'sample_jobs'
