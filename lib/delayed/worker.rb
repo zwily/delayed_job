@@ -20,7 +20,7 @@ module Delayed
     end
 
     # name_prefix is ignored if name is set directly
-    attr_accessor :name_prefix
+    attr_accessor :name_prefix, :queue
     
     cattr_reader :backend
     
@@ -35,7 +35,7 @@ module Delayed
 
     def initialize(options={})
       @quiet = options[:quiet]
-      @queue = options[:queue]
+      @queue = options[:queue] || self.class.queue
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
       self.class.max_priority = options[:max_priority] if options.has_key?(:max_priority)
     end

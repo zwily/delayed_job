@@ -178,8 +178,9 @@ describe Delayed::Worker do
   end
 
 
-  context "Different queue workers" do
+  context "Queue workers" do
     before :each do
+      Delayed::Worker.queue = nil
       job_create(:queue => 'queue1')
       job_create(:queue => 'queue2')
       job_create(:queue => nil)
@@ -207,12 +208,30 @@ describe Delayed::Worker do
       SimpleJob.runs.should == 0
     end
 
-    it "should run non-named runner jobs when the runner has no name set" do
+    it "should run non-named queue jobs when the queue has no name set" do
       worker = worker_create(:queue=>nil)
-
       SimpleJob.runs.should == 0
       worker.work_off
       SimpleJob.runs.should == 1
+    end
+    
+    it "should get the default queue if none is set" do
+      queue_name = "default_queue"
+      Delayed::Worker.queue = queue_name
+      worker = worker_create(:queue=>nil)
+      worker.queue.should == queue_name
+    end
+    
+    it "should override default queue name if specified in initialize" do
+      queue_name = "my_queue"
+      Delayed::Worker.queue = "default_queue"
+      worker = worker_create(:queue=>queue_name)
+      worker.queue.should == queue_name
+    end
+    
+    it "shouldn't have a queue if none is set" do
+      worker = worker_create(:queue=>nil)
+      worker.queue.should == nil
     end
   end
 end
