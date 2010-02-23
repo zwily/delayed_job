@@ -23,7 +23,7 @@ module Delayed
           options = args.first || {}
           options[:priority] ||= 0
           options[:payload_object] = object
-          
+          options[:queue] ||= Delayed::Worker.queue
           self.create(options)
         end
       end

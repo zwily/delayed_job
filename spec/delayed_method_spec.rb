@@ -1,7 +1,10 @@
 require 'spec_helper'
 
 describe 'random ruby objects' do
-  before       { Delayed::Job.delete_all }
+   before :each do
+     Delayed::Worker.queue = nil
+     Delayed::Job.delete_all
+   end
 
   it "should respond_to :send_later method" do
     Object.new.respond_to?(:send_later)
@@ -56,6 +59,19 @@ describe 'random ruby objects' do
     job.payload_object.args.should    == [1, 5]
     job.payload_object.perform.should == 'Once upon...'
   end
+  
+  context "send_later" do
+    it "should use the default queue if there is one" do
+      Delayed::Worker.queue = "testqueue"
+      job = "string".send_later :reverse
+      job.queue.should == "testqueue"
+    end
+    
+    it "should have nil queue if there is not a default" do
+      job = "string".send_later :reverse
+      job.queue.should == nil
+    end
+  end
 
   context "send_at" do
     it "should queue a new job" do
@@ -76,6 +92,17 @@ describe 'random ruby objects' do
       job.payload_object.method.should  == :count
       job.payload_object.args.should    == ['r']
       job.payload_object.perform.should == 1
+    end
+    
+    it "should use the default queue if there is one" do
+      Delayed::Worker.queue = "testqueue"
+      job = "string".send_at 1.hour.from_now, :reverse
+      job.queue.should == "testqueue"
+    end
+    
+    it "should have nil queue if there is not a default" do
+      job = "string".send_at 1.hour.from_now, :reverse
+      job.queue.should == nil
     end
   end
 
