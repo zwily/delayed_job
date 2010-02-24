@@ -4,7 +4,7 @@ require 'optparse'
 
 module Delayed
   class Command
-    attr_accessor :worker_count
+    attr_accessor :worker_count, :process_name
     
     def initialize(args)
       @files_to_reopen = []
@@ -31,7 +31,10 @@ module Delayed
         opts.on('-n', '--number_of_workers=workers', "Number of unique workers to spawn") do |worker_count|
           @worker_count = worker_count.to_i rescue 1
         end
-        opts.on('-q', '--queue=queue_name', "The name of the queue for the workers to pull work from") do |queue|
+        opts.on('-p', '--process-name=NAME', "The name to append to the process name. eg. delayed_job_NAME") do |process_name|
+          @process_name = process_name
+        end
+        opts.on('-q', '--queue=QUEUE_NAME', "The name of the queue for the workers to pull work from") do |queue|
           @options[:queue] = queue
         end
       end
@@ -44,7 +47,8 @@ module Delayed
       end
       
       worker_count.times do |worker_index|
-        process_name = worker_count == 1 ? "delayed_job" : "delayed_job.#{worker_index}"
+        base_name =  @process_name ? "delayed_job_#{@process_name}" : "delayed_job"
+        process_name = worker_count == 1 ? base_name : "#{base_name}.#{worker_index}"
         Daemons.run_proc(process_name, :dir => "#{RAILS_ROOT}/tmp/pids", :dir_mode => :normal, :ARGV => @args) do |*args|
           run process_name
         end
