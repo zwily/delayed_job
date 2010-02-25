@@ -119,6 +119,12 @@ describe 'random ruby objects' do
       job.run_at.should == time
     end
     
+    it "should override the default queue" do
+      Delayed::Worker.queue = "default_queue"
+      job = "string".send_at_with_queue(1.hour.from_now, :length, "testqueue")
+      job.queue.should == "testqueue"
+    end
+    
     it "should store payload as PerformableMethod" do
       job = "string".send_at_with_queue(1.hour.from_now, :count, "testqueue", 'r')
       job.payload_object.class.should   == Delayed::PerformableMethod
