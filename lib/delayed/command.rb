@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'daemons'
+require File.expand_path(File.join(File.dirname(__FILE__), 'ext', 'daemons_monkey'))
 require 'optparse'
 
 module Delayed
