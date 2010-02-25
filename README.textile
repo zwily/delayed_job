@@ -32,10 +32,16 @@ rescue LoadError
 end
 </pre>
 
-To install as a plugin:
+To install as a plugin: (main branch)
 
 <pre>
 script/plugin install git://github.com/collectiveidea/delayed_job.git
+</pre>
+
+To install as a plugin: (this fork)
+
+<pre>
+script/plugin install git://github.com/brackenm/delayed_job.git
 </pre>
 
 After delayed_job is installed, you will need to setup the backend.
@@ -108,8 +114,13 @@ $ RAILS_ENV=production script/delayed_job stop
 $ RAILS_ENV=production script/delayed_job -n 2 start
 $ RAILS_ENV=production script/delayed_job stop
 
-# Specify the queue the worker should work out of with -q/--queue
+# Specify the queue the worker should work out of with -q/--queue=QUEUE_NAME
 $ RAILS_ENV=production script/delayed_job start --queue=my_queue
+$ RAILS_ENV=production script/delayed_job stop
+
+# Specify a name to append to the process name -p/--process-name=NAME
+# the process name will be "delayed_job_#{NAME}"
+$ RAILS_ENV=production script/delayed_job start -p custom_name
 $ RAILS_ENV=production script/delayed_job stop
 </pre>
 
@@ -176,6 +187,7 @@ Delayed::Worker.queue = "my_queue"
 h3. Cleaning up
 
 You can invoke @rake jobs:clear@ to delete all jobs in the queue.
+To only delete jobs for a specific queue run @rake jobs:clear[queue_name]@.
 
 h2. Mailing List
 
