@@ -41,7 +41,7 @@ script/plugin install git://github.com/collectiveidea/delayed_job.git
 To install as a plugin: (this fork)
 
 <pre>
-script/plugin install git://github.com/brackenm/delayed_job.git
+script/plugin install git://github.com/bracken/delayed_job.git
 </pre>
 
 After delayed_job is installed, you will need to setup the backend.
