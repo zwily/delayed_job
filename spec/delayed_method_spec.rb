@@ -55,7 +55,7 @@ describe 'random ruby objects' do
     Delayed::Job.count.should == 1
     job =  Delayed::Job.find(:first)
     job.payload_object.class.should   == Delayed::PerformableMethod
-    job.payload_object.method.should  == :whatever_else_without_send_later_with_queue
+    job.payload_object.method.should  == :whatever_else_without_send_later
     job.payload_object.args.should    == [1, 5]
     job.payload_object.perform.should == 'Once upon...'
   end
