@@ -56,13 +56,18 @@ module Delayed
       @name = val
     end
 
+    def exit?
+      @exit
+    end
+
     def start(exit_when_queues_empty = false)
       enable_gc_optimizations
+      @exit = false
 
       say "*** Starting job worker #{name}"
 
-      trap('TERM') { say 'Exiting...'; $exit = true }
-      trap('INT')  { say 'Exiting...'; $exit = true }
+      trap('TERM') { say 'Exiting...'; @exit = true }
+      trap('INT')  { say 'Exiting...'; @exit = true }
 
       loop do
         job = Delayed::Job.get_and_lock_next_available(name,
@@ -81,7 +86,7 @@ module Delayed
           sleep(@@sleep_delay)
         end
 
-        break if $exit
+        break if exit?
       end
 
     ensure
