@@ -8,10 +8,6 @@ describe Delayed::Worker do
     Delayed::Worker.new(opts.merge(:max_priority => nil, :min_priority => nil, :quiet => true))
   end
 
-  before(:all) do
-    Delayed::Worker.send :public, :work_off
-  end
-
   before(:each) do
     # Make sure backend is set to active record
     Delayed::Worker.backend = :active_record
@@ -57,23 +53,23 @@ describe Delayed::Worker do
       @worker = Delayed::Worker.new(:max_priority => 5, :min_priority => -5, :quiet => true)
     end
 
-    it "should only work_off jobs that are >= min_priority" do
+    it "should only run jobs that are >= min_priority" do
       SimpleJob.runs.should == 0
 
       job_create(:priority => -10)
       job_create(:priority => 0)
-      @worker.work_off
+      @worker.start(true)
 
       SimpleJob.runs.should == 1
     end
 
-    it "should only work_off jobs that are <= max_priority" do
+    it "should only run jobs that are <= max_priority" do
       SimpleJob.runs.should == 0
 
       job_create(:priority => 10)
       job_create(:priority => 0)
 
-      @worker.work_off
+      @worker.start(true)
 
       SimpleJob.runs.should == 1
     end
@@ -86,23 +82,23 @@ describe Delayed::Worker do
     
     it "should not run jobs locked by another worker" do
       job_create(:locked_by => 'other_worker', :locked_at => (Delayed::Job.db_time_now - 1.minutes))
-      lambda { @worker.work_off }.should_not change { SimpleJob.runs }
+      lambda { @worker.start(true) }.should_not change { SimpleJob.runs }
     end
     
     it "should run open jobs" do
       job_create
-      lambda { @worker.work_off }.should change { SimpleJob.runs }.from(0).to(1)
+      lambda { @worker.start(true) }.should change { SimpleJob.runs }.from(0).to(1)
     end
     
     it "should run expired jobs" do
       expired_time = Delayed::Job.db_time_now - (1.minutes + Delayed::Worker.max_run_time)
       job_create(:locked_by => 'other_worker', :locked_at => expired_time)
-      lambda { @worker.work_off }.should change { SimpleJob.runs }.from(0).to(1)
+      lambda { @worker.start(true) }.should change { SimpleJob.runs }.from(0).to(1)
     end
     
     it "should run own jobs" do
       job_create(:locked_by => @worker.name, :locked_at => (Delayed::Job.db_time_now - 1.minutes))
-      lambda { @worker.work_off }.should change { SimpleJob.runs }.from(0).to(1)
+      lambda { @worker.start(true) }.should change { SimpleJob.runs }.from(0).to(1)
     end
   end
   
@@ -189,14 +185,14 @@ describe Delayed::Worker do
     it "should only work off jobs assigned to themselves" do
       worker = worker_create(:queue=>'queue1')
       SimpleJob.runs.should == 0
-      worker.work_off
+      worker.start(true)
       SimpleJob.runs.should == 1
       
       SimpleJob.runs = 0
 
       worker = worker_create(:queue=>'queue2')
       SimpleJob.runs.should == 0
-      worker.work_off
+      worker.start(true)
       SimpleJob.runs.should == 1
     end
 
@@ -204,14 +200,14 @@ describe Delayed::Worker do
       worker = worker_create(:queue=>'queue3')
 
       SimpleJob.runs.should == 0
-      worker.work_off
+      worker.start(true)
       SimpleJob.runs.should == 0
     end
 
     it "should run non-named queue jobs when the queue has no name set" do
       worker = worker_create(:queue=>nil)
       SimpleJob.runs.should == 0
-      worker.work_off
+      worker.start(true)
       SimpleJob.runs.should == 1
     end
     

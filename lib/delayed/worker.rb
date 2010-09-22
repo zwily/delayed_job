@@ -2,12 +2,12 @@ require 'timeout'
 
 module Delayed
   class Worker
-    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :logger, :queue
+    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :logger, :queue, :cant_fork
     self.sleep_delay = 5
     self.max_attempts = 25
     self.max_run_time = 4.hours
     self.queue = nil
-    
+
     # By default failed jobs are destroyed after too many attempts. If you want to keep them around
     # (perhaps to inspect the reason for the failure), set this to false.
     cattr_accessor :destroy_failed_jobs
@@ -56,27 +56,29 @@ module Delayed
       @name = val
     end
 
-    def start
+    def start(exit_when_queues_empty = false)
+      enable_gc_optimizations
+
       say "*** Starting job worker #{name}"
 
       trap('TERM') { say 'Exiting...'; $exit = true }
       trap('INT')  { say 'Exiting...'; $exit = true }
 
       loop do
-        result = nil
-
-        realtime = Benchmark.realtime do
-          result = work_off
-        end
-
-        count = result.sum
-
-        break if $exit
-
-        if count.zero?
-          sleep(@@sleep_delay)
+        job = Delayed::Job.get_and_lock_next_available(name,
+                                                       self.class.max_run_time,
+                                                       @queue)
+        if job
+          if @child = fork
+            Process.wait
+          else
+            run(job)
+            exit! unless self.class.cant_fork
+          end
+        elsif exit_when_queues_empty
+          break
         else
-          say "#{count} jobs processed at %.4f j/s, %d failed ..." % [count / realtime, result.last]
+          sleep(@@sleep_delay)
         end
 
         break if $exit
@@ -85,27 +87,7 @@ module Delayed
     ensure
       Delayed::Job.clear_locks!(name)
     end
-    
-    # Do num jobs and return stats on success/failure.
-    # Exit early if interrupted.
-    def work_off(num = 100)
-      success, failure = 0, 0
 
-      num.times do
-        case reserve_and_run_one_job
-        when true
-            success += 1
-        when false
-            failure += 1
-        else
-          break  # leave if no work could be done
-        end
-        break if $exit # leave if we're exiting
-      end
-
-      return [success, failure]
-    end
-    
     def run(job)
       self.ensure_db_connection
       runtime =  Benchmark.realtime do
@@ -139,31 +121,20 @@ module Delayed
       logger.add level, "#{Time.now.strftime('%FT%T%z')}: #{text}" if logger
     end
 
+    # Enables GC Optimizations if you're running REE.
+    # http://www.rubyenterpriseedition.com/faq.html#adapt_apps_for_cow
+    def enable_gc_optimizations
+      if GC.respond_to?(:copy_on_write_friendly=)
+        GC.copy_on_write_friendly = true
+      end
+    end
+
   protected
     
     def handle_failed_job(job, error)
       job.last_error = error.message + "\n" + error.backtrace.join("\n")
       say "* [JOB] #{name} failed with #{error.class.name}: #{error.message} - #{job.attempts} failed attempts", Logger::ERROR
       reschedule(job)
-    end
-    
-    # Run the next job we can get an exclusive lock on.
-    # If no jobs are left we return nil
-    def reserve_and_run_one_job
-
-      # We get up to 5 jobs from the db. In case we cannot get exclusive access to a job we try the next.
-      # this leads to a more even distribution of jobs across the worker processes
-      job = Delayed::Job.find_available(name, 5, self.class.max_run_time, @queue).detect do |job|
-        if job.lock_exclusively!(self.class.max_run_time, name)
-          say "* [Worker(#{name})] acquired lock on #{job.name}"
-          true
-        else
-          say "* [Worker(#{name})] failed to acquire exclusive lock for #{job.name}", Logger::WARN
-          false
-        end
-      end
-
-      run(job) if job
     end
     
     # Makes a dummy call to the database to make sure we're still connected
@@ -181,6 +152,21 @@ module Delayed
         @already_retried = false
       end
     end
-    
+
+    def fork
+      return nil if self.class.cant_fork
+
+      begin
+        if Kernel.respond_to?(:fork)
+          Kernel.fork
+        else
+          raise NotImplementedError
+        end
+      rescue NotImplementedError
+        self.class.cant_fork = true
+        nil
+      end
+    end
+
   end
 end

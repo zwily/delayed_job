@@ -33,17 +33,41 @@ module Delayed
           update_all("locked_by = null, locked_at = null", ["locked_by = ?", worker_name])
         end
 
-        # Find a few candidate jobs to run (in case some immediately get locked by others).
-        def self.find_available(worker_name, limit = 5, max_run_time = Worker.max_run_time, queue=nil)
+        def self.get_and_lock_next_available(worker_name,
+                                             max_run_time = Worker.max_run_time,
+                                             queue = nil)
+          scope = self.all_available(worker_name, max_run_time, queue)
+
+          ::ActiveRecord::Base.silence do
+            # it'd be a big win to do this in a DB function and avoid the extra
+            # round trip.
+            transaction do
+              job = scope.find(:first, :lock => true)
+              if job
+                job.update_attributes(:locked_at => db_time_now,
+                                      :locked_by => worker_name)
+              end
+              job
+            end
+          end
+        end
+
+        def self.find_available(worker_name,
+                                limit = 5,
+                                max_run_time = Worker.max_run_time,
+                                queue = nil)
+          all_available(worker_name, max_run_time, queue).all(:limit => limit)
+        end
+
+        def self.all_available(worker_name,
+                               max_run_time = Worker.max_run_time,
+                               queue = nil)
           scope = self.ready_to_run(worker_name, max_run_time)
           scope = scope.scoped(:conditions => ['priority >= ?', Worker.min_priority]) if Worker.min_priority
           scope = scope.scoped(:conditions => ['priority <= ?', Worker.max_priority]) if Worker.max_priority
           scope = scope.scoped(:conditions => ['queue = ?', queue]) if queue
           scope = scope.scoped(:conditions => ['queue is null']) unless queue
-      
-          ::ActiveRecord::Base.silence do
-            scope.by_priority.all(:limit => limit)
-          end
+          scope.by_priority
         end
 
         # Lock this job for this worker.

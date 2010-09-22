@@ -42,5 +42,7 @@ class Story < ActiveRecord::Base
   handle_asynchronously_with_queue :whatever_else, "testqueue"
 end
 
+Delayed::Worker.cant_fork = true
+
 require 'sample_jobs'
 require 'shared_backend_spec'
