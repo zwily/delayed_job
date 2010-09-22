@@ -23,6 +23,9 @@ module Delayed
         include Delayed::Backend::Base
         set_table_name :delayed_jobs
 
+        cattr_accessor :default_priority
+        self.default_priority = 0
+
         named_scope :ready_to_run, lambda {|worker_name, max_run_time|
           {:conditions => ['(run_at <= ? AND (locked_at IS NULL OR locked_at < ?) OR locked_by = ?) AND failed_at IS NULL', db_time_now, db_time_now - max_run_time, worker_name]}
         }

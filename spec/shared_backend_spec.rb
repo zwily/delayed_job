@@ -30,6 +30,15 @@ shared_examples_for 'a backend' do
     @job.priority.should == 5
   end
 
+  it "should use the default priority when enqueuing items" do
+    @job = @backend.enqueue SimpleJob.new
+    @job.priority.should == 0
+    @backend.default_priority = 10
+    @job = @backend.enqueue SimpleJob.new
+    @job.priority.should == 10
+    @backend.default_priority = 0
+  end
+
   it "should be able to set run_at when enqueuing items" do
     later = @backend.db_time_now + 5.minutes
     @job = @backend.enqueue SimpleJob.new, :priority => 5, :run_at => later
