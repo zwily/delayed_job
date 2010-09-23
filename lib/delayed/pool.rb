@@ -90,6 +90,9 @@ module Delayed
     end
 
     def spawn_worker(worker_config)
+      worker_config = worker_config.with_indifferent_access
+      worker_config[:max_priority] ||= nil
+      worker_config[:min_priority] ||= nil
       worker = Delayed::PoolWorker.new(worker_config)
       pid = fork do
         ActiveRecord::Base.connection.reconnect!

@@ -60,6 +60,12 @@ module Delayed
       @exit
     end
 
+    def priority_string
+      min_priority = self.class.min_priority || 0
+      max_priority = self.class.max_priority
+      "priorities #{min_priority}..#{max_priority || "max"}"
+    end
+
     def start(exit_when_queues_empty = false)
       enable_gc_optimizations
       @exit = false
@@ -69,20 +75,28 @@ module Delayed
       trap('TERM') { say 'Exiting...'; @exit = true }
       trap('INT')  { say 'Exiting...'; @exit = true }
 
+      waiting = false # avoid logging "waiting for queue" over and over
+
       loop do
         job = Delayed::Job.get_and_lock_next_available(name,
                                                        self.class.max_run_time,
                                                        @queue)
         if job
+          waiting = false
+          start_time = Time.now
           if @child = fork
+            procline "Forked #{@child} at #{start_time.to_i}"
             Process.wait
           else
+            procline "Processing #{job.name} since #{start_time.to_i}"
             run(job)
             exit! unless self.class.cant_fork
           end
         elsif exit_when_queues_empty
           break
         else
+          procline("Waiting for #{@queue} #{priority_string}") unless waiting
+          waiting = true
           sleep(@@sleep_delay)
         end
 
@@ -171,6 +185,11 @@ module Delayed
         self.class.cant_fork = true
         nil
       end
+    end
+
+    def procline(string)
+      $0 = "delayed_job: #{string}"
+      say "* #{string}"
     end
 
   end
