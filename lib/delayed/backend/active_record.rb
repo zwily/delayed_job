@@ -26,6 +26,12 @@ module Delayed
         cattr_accessor :default_priority
         self.default_priority = 0
 
+        # if true, we'll use the more efficient 'select ... for update' form
+        # rather than selecting 5 rows and trying to lock each one in turn.
+        # there's some deadlock issues with this right now though.
+        cattr_accessor :use_row_locking
+        self.use_row_locking = false
+
         named_scope :ready_to_run, lambda {|worker_name, max_run_time|
           {:conditions => ['(run_at <= ? AND (locked_at IS NULL OR locked_at < ?) OR locked_by = ?) AND failed_at IS NULL', db_time_now, db_time_now - max_run_time, worker_name]}
         }
@@ -39,19 +45,30 @@ module Delayed
         def self.get_and_lock_next_available(worker_name,
                                              max_run_time = Worker.max_run_time,
                                              queue = nil)
-          scope = self.all_available(worker_name, max_run_time, queue)
+          if self.use_row_locking
+            scope = self.all_available(worker_name, max_run_time, queue)
 
-          ::ActiveRecord::Base.silence do
-            # it'd be a big win to do this in a DB function and avoid the extra
-            # round trip.
-            transaction do
-              job = scope.find(:first, :lock => true)
-              if job
-                job.update_attributes(:locked_at => db_time_now,
-                                      :locked_by => worker_name)
+            ::ActiveRecord::Base.silence do
+              # it'd be a big win to do this in a DB function and avoid the extra
+              # round trip.
+              transaction do
+                job = scope.find(:first, :lock => true)
+                if job
+                  job.update_attributes(:locked_at => db_time_now,
+                                        :locked_by => worker_name)
+                end
+                job
               end
-              job
             end
+          else
+            job = find_available(worker_name, 5, max_run_time, queue).detect do |job|
+              if job.lock_exclusively!(max_run_time, worker_name)
+                true
+              else
+                false
+              end
+            end
+            job
           end
         end
 
