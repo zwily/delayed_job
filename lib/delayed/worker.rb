@@ -91,7 +91,6 @@ module Delayed
             procline "watch: #{@child}:#{start_time.to_i}"
             Process.wait
           else
-            procline "run: #{job.name}:#{start_time.to_i}"
             run(job)
             exit! unless self.class.cant_fork
           end
@@ -111,6 +110,7 @@ module Delayed
     end
 
     def run(job)
+      procline "run: #{job.name}:#{start_time.to_i}"
       self.ensure_db_connection
       runtime =  Benchmark.realtime do
         Timeout.timeout(self.class.max_run_time.to_i) { job.invoke_job }
