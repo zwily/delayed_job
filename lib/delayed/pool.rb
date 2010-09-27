@@ -76,7 +76,12 @@ module Delayed
     def join
       begin
         loop do
-          Process.wait
+          child = Process.wait
+          if child
+            worker = delete_worker(child)
+            say "**** child died: #{child}, restarting"
+            spawn_worker(worker.config)
+          end
         end
       rescue Errno::ECHILD
       end
@@ -102,9 +107,20 @@ module Delayed
       workers[worker_config['queue']][pid] = worker
     end
 
+    def delete_worker(child)
+      workers.each do |queue, pids|
+        worker = pids.delete(child)
+        return worker if worker
+      end
+      say "whoaaa wtf this child isn't known: #{child}"
+    end
+
     def say(text, level = Logger::INFO)
-      puts text unless @quiet
-      logger.add level, "#{Time.now.strftime('%FT%T%z')}: #{text}" if logger
+      if logger
+        logger.add level, "#{Time.now.strftime('%FT%T%z')}: #{text}"
+      else
+        puts text
+      end
     end
 
   end

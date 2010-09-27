@@ -8,6 +8,8 @@ module Delayed
     self.max_run_time = 4.hours
     self.queue = nil
 
+    attr_reader :config
+
     # By default failed jobs are destroyed after too many attempts. If you want to keep them around
     # (perhaps to inspect the reason for the failure), set this to false.
     cattr_accessor :destroy_failed_jobs
@@ -34,6 +36,7 @@ module Delayed
     end
 
     def initialize(options={})
+      @config = options
       @quiet = options[:quiet]
       @queue = options[:queue] || self.class.queue
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
