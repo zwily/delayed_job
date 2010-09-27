@@ -66,7 +66,7 @@ module Delayed
     def priority_string
       min_priority = self.class.min_priority || 0
       max_priority = self.class.max_priority
-      "priorities #{min_priority}..#{max_priority || "max"}"
+      "#{min_priority}:#{max_priority || "max"}"
     end
 
     def start(exit_when_queues_empty = false)
@@ -88,17 +88,17 @@ module Delayed
           waiting = false
           start_time = Time.now
           if @child = fork
-            procline "Forked #{@child} at #{start_time.to_i}"
+            procline "watch: #{@child}:#{start_time.to_i}"
             Process.wait
           else
-            procline "Processing #{job.name} since #{start_time.to_i}"
+            procline "run: #{job.name}:#{start_time.to_i}"
             run(job)
             exit! unless self.class.cant_fork
           end
         elsif exit_when_queues_empty
           break
         else
-          procline("Waiting for #{@queue} #{priority_string}") unless waiting
+          procline("wait:#{@queue}:#{priority_string}") unless waiting
           waiting = true
           sleep(@@sleep_delay)
         end
@@ -191,7 +191,7 @@ module Delayed
     end
 
     def procline(string)
-      $0 = "delayed_job: #{string}"
+      $0 = "delayed:#{string}"
       say "* #{string}"
     end
 
