@@ -91,7 +91,7 @@ module Delayed
             procline "watch: #{@child}:#{start_time.to_i}"
             Process.wait
           else
-            run(job)
+            run(job, start_time)
             exit! unless self.class.cant_fork
           end
         elsif exit_when_queues_empty
@@ -109,7 +109,7 @@ module Delayed
       Delayed::Job.clear_locks!(name)
     end
 
-    def run(job)
+    def run(job, start_time)
       procline "run: #{job.name}:#{start_time.to_i}"
       self.ensure_db_connection
       runtime =  Benchmark.realtime do
@@ -128,7 +128,7 @@ module Delayed
     # Uses an exponential scale depending on the number of failed attempts.
     def reschedule(job, time = nil)
       if (job.attempts += 1) < self.class.max_attempts
-        time ||= Job.db_time_now + (job.attempts ** 4) + 5
+        time ||= job.reschedule_at
         job.run_at = time
         job.unlock
         job.save!

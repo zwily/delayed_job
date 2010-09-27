@@ -15,7 +15,7 @@ module Delayed
     class LoadError < StandardError
     end
 
-    def initialize(object, method, args)
+    def initialize(object, method, args = [])
       raise NoMethodError, "undefined method `#{method}' for #{object.inspect}" unless object.respond_to?(method)
 
       self.object = dump(object)
@@ -32,10 +32,14 @@ module Delayed
     end
     
     def perform
-      load(object).send(method, *args.map{|a| load(a)})
+      live_object.send(method, *args.map{|a| load(a)})
     rescue PerformableMethod::LoadError
       # We cannot do anything about objects that can't be loaded
       true
+    end
+
+    def live_object
+      @live_object ||= load(object)
     end
 
     private
