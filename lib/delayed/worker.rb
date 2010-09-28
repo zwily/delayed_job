@@ -109,7 +109,7 @@ module Delayed
       Delayed::Job.clear_locks!(name)
     end
 
-    def run(job, start_time)
+    def run(job, start_time = Time.now)
       procline "run: #{job.name}:#{start_time.to_i}"
       self.ensure_db_connection
       runtime =  Benchmark.realtime do

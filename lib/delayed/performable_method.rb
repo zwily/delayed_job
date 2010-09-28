@@ -1,3 +1,13 @@
+class Class
+  def load_for_delayed_job(arg)
+    self
+  end
+
+  def dump_for_delayed_job
+    name
+  end
+end
+
 class Module
   def yaml_tag_read_class(name)
     name.constantize
