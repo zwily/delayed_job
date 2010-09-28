@@ -1,9 +1,6 @@
-class Class
-  def load_for_delayed_job(arg)
-    self
-  end
-  
-  def dump_for_delayed_job
+class Module
+  def yaml_tag_read_class(name)
+    name.constantize
     name
   end
 end
