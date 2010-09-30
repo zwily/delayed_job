@@ -8,11 +8,11 @@ end
 
 describe Delayed::PerformableMethod do
   
-  it "should ignore ActiveRecord::RecordNotFound errors because they are permanent" do
+  it "should NOT FREAKING ignore ActiveRecord::RecordNotFound errors because they are NOT ALWAYS permanent" do
     story = Story.create :text => 'Once upon...'
     p = Delayed::PerformableMethod.new(story, :tell, [])
     story.destroy
-    lambda { p.perform }.should_not raise_error
+    lambda { p.perform }.should raise_error
   end
   
   it "should store the object as string if its an active record" do

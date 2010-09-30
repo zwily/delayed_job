@@ -40,9 +40,6 @@ module Delayed
     
     def perform
       live_object.send(method, *args.map{|a| load(a)})
-    rescue PerformableMethod::LoadError
-      # We cannot do anything about objects that can't be loaded
-      true
     end
 
     def live_object
