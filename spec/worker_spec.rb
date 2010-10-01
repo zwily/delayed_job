@@ -114,12 +114,21 @@ describe Delayed::Worker do
     it "should record last_error when destroy_failed_jobs = false, max_attempts = 1" do
       Delayed::Worker.destroy_failed_jobs = false
       Delayed::Worker.max_attempts = 1
+      @job.lock_exclusively!(Delayed::Worker.max_run_time, @worker.name).should == true
       @worker.run(@job)
       @job.reload
       @job.last_error.should =~ /did not work/
       @job.last_error.should =~ /worker_spec.rb/
       @job.attempts.should == 1
       @job.failed_at.should_not be_nil
+      @job.run_at.should > Delayed::Job.db_time_now - 10.minutes
+      @job.run_at.should < Delayed::Job.db_time_now + 10.minutes
+      @job.should_not be_locked
+
+      all_jobs = Delayed::Job.all_available(@worker.name,
+                                 Delayed::Worker.max_run_time,
+                                 @job.queue)
+      all_jobs.find_by_id(@job.id).should be_nil
     end
     
     it "should re-schedule jobs after failing" do

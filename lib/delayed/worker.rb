@@ -127,15 +127,22 @@ module Delayed
     # Reschedule the job in the future (when a job fails).
     # Uses an exponential scale depending on the number of failed attempts.
     def reschedule(job, time = nil)
-      if (job.attempts += 1) < self.class.max_attempts
-        time ||= job.reschedule_at
-        job.run_at = time
-        job.unlock
-        job.save!
-      else
-        say "* [JOB] PERMANENTLY removing #{job.name} because of #{job.attempts} consecutive failures.", Logger::INFO
-        self.class.destroy_failed_jobs ? job.destroy : job.update_attribute(:failed_at, Delayed::Job.db_time_now)
+      job.attempts += 1
+      if job.attempts >= self.class.max_attempts
+        job.failed_at = Delayed::Job.db_time_now
+        if self.class.destroy_failed_jobs
+          say "* [JOB] PERMANENTLY removing #{job.name} because of #{job.attempts} consecutive failures.", Logger::INFO
+          job.destroy
+          return
+        end
       end
+
+      # still reschedule even if the job has failed max_attempts times -- maybe
+      # somebody will increase max_attempts later
+      time ||= job.reschedule_at
+      job.run_at = time
+      job.unlock
+      job.save!
     end
 
     def say(text, level = Logger::INFO)

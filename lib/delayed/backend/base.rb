@@ -65,6 +65,10 @@ module Delayed
         self.locked_by    = nil
       end
 
+      def locked?
+        !!(self.locked_at || self.locked_by)
+      end
+
       def reschedule_at
         new_time = self.class.db_time_now + (attempts ** 4) + 5
         if payload_object.respond_to?(:reschedule_at)
