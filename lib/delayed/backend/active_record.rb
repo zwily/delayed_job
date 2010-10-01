@@ -105,6 +105,10 @@ module Delayed
           if affected_rows == 1
             self.locked_at    = now
             self.locked_by    = worker
+            # we cheated ActiveRecord::Dirty with the update_all calls above, so
+            # we'll fix things up here.
+            changed_attributes['locked_at'] = now
+            changed_attributes['locked_by'] = worker
             return true
           else
             return false
