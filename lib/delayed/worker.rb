@@ -1,8 +1,41 @@
 require 'timeout'
 
 module Delayed
-  class Worker
-    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :logger, :queue, :cant_fork
+  class WorkerBase
+    cattr_accessor :logger
+    attr_reader :config
+
+    self.logger = if defined?(Merb::Logger)
+      Merb.logger
+    elsif defined?(RAILS_DEFAULT_LOGGER)
+      RAILS_DEFAULT_LOGGER
+    end
+
+    def initialize(options={})
+      @config = options
+    end
+
+    def exit?
+      @exit
+    end
+
+    def worker_type_string
+      ""
+    end
+
+    def say(text, level = Logger::INFO)
+      puts text unless @quiet
+      logger.add level, "#{Time.now.strftime('%FT%T%z')}: #{text}" if logger
+    end
+
+    def procline(string)
+      $0 = "#{worker_type_string}:#{string}"
+      say "* #{string}"
+    end
+  end
+
+  class Worker < WorkerBase
+    cattr_accessor :min_priority, :max_priority, :max_attempts, :max_run_time, :sleep_delay, :queue, :cant_fork
     self.sleep_delay = 5
     self.max_attempts = 25
     self.max_run_time = 4.hours
@@ -15,12 +48,6 @@ module Delayed
     cattr_accessor :destroy_failed_jobs
     self.destroy_failed_jobs = true
     
-    self.logger = if defined?(Merb::Logger)
-      Merb.logger
-    elsif defined?(RAILS_DEFAULT_LOGGER)
-      RAILS_DEFAULT_LOGGER
-    end
-
     # name_prefix is ignored if name is set directly
     attr_accessor :name_prefix, :queue
     
@@ -36,7 +63,7 @@ module Delayed
     end
 
     def initialize(options={})
-      @config = options
+      super
       @quiet = options[:quiet]
       @queue = options[:queue] || self.class.queue
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
@@ -57,10 +84,6 @@ module Delayed
     # Setting the name to nil will reset the default worker name
     def name=(val)
       @name = val
-    end
-
-    def exit?
-      @exit
     end
 
     def priority_string
@@ -145,11 +168,6 @@ module Delayed
       job.save!
     end
 
-    def say(text, level = Logger::INFO)
-      puts text unless @quiet
-      logger.add level, "#{Time.now.strftime('%FT%T%z')}: #{text}" if logger
-    end
-
     # Enables GC Optimizations if you're running REE.
     # http://www.rubyenterpriseedition.com/faq.html#adapt_apps_for_cow
     def enable_gc_optimizations
@@ -165,7 +183,11 @@ module Delayed
       say "* [JOB] #{name} failed with #{error.class.name}: #{error.message} - #{job.attempts} failed attempts", Logger::ERROR
       reschedule(job)
     end
-    
+
+    def worker_type_string
+      "delayed"
+    end
+
     # Makes a dummy call to the database to make sure we're still connected
     def ensure_db_connection
       begin
@@ -196,11 +218,44 @@ module Delayed
         nil
       end
     end
+  end
 
-    def procline(string)
-      $0 = "delayed:#{string}"
-      say "* #{string}"
+  class PeriodicWorker < WorkerBase
+
+    def initialize(config)
+      super
+      @frequency = 0.33
     end
 
+    def start
+      @exit = false
+
+      say "*** Starting period job scheduler"
+
+      trap('TERM') { say 'Exiting...'; @exit = true }
+      trap('INT')  { say 'Exiting...'; @exit = true }
+
+      # defer requiring this so that it's not required if the user doesn't want it
+      require 'rufus/scheduler'
+      scheduler = Rufus::Scheduler.start_new
+      eval(IO.read(@config[:periodic]), binding)
+
+      procline "running"
+
+      while !exit?
+        sleep @frequency
+      end
+
+      scheduler.all_jobs.each do |id, job|
+        job.unschedule
+      end
+    end
+
+    protected
+
+    def worker_type_string
+      "periodic"
+    end
   end
+
 end
