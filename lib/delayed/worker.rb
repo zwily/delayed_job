@@ -62,6 +62,19 @@ module Delayed
       silence_warnings { ::Delayed.const_set(:Job, backend) }
     end
 
+    # Callback to fire when a delayed job fails max_attempts times. If this
+    # callback is defined, then the value of destroy_failed_jobs is ignored, and
+    # the job is destroyed if this block returns true.
+    #
+    # This allows for destroying "uninteresting" failures, while keeping around
+    # interesting failures to be investigated later.
+    #
+    # The block is called with args(job, last_exception)
+    def self.on_max_failures=(block)
+      @@on_max_failures = block
+    end
+    cattr_reader :on_max_failures
+
     def initialize(options={})
       super
       @quiet = options[:quiet]
@@ -149,11 +162,16 @@ module Delayed
     
     # Reschedule the job in the future (when a job fails).
     # Uses an exponential scale depending on the number of failed attempts.
-    def reschedule(job, time = nil)
+    def reschedule(job, error = nil, time = nil)
       job.attempts += 1
       if job.attempts >= self.class.max_attempts
         job.failed_at = Delayed::Job.db_time_now
-        if self.class.destroy_failed_jobs
+        if self.class.on_max_failures
+          destroy_job = self.class.on_max_failures.call(job, error)
+        else
+          destroy_job = self.class.destroy_failed_jobs
+        end
+        if destroy_job
           say "* [JOB] PERMANENTLY removing #{job.name} because of #{job.attempts} consecutive failures.", Logger::INFO
           job.destroy
           return
@@ -181,7 +199,7 @@ module Delayed
     def handle_failed_job(job, error)
       job.last_error = error.message + "\n" + error.backtrace.join("\n")
       say "* [JOB] #{name} failed with #{error.class.name}: #{error.message} - #{job.attempts} failed attempts", Logger::ERROR
-      reschedule(job)
+      reschedule(job, error)
     end
 
     def worker_type_string

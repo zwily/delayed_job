@@ -180,6 +180,28 @@ describe Delayed::Worker do
       end
       
     end
+
+    context "and we give an on_max_failures callback" do
+      it "should not be destroyed if it failed max_attempts times and cb is false" do
+        Delayed::Worker.destroy_failed_jobs = true
+        Delayed::Worker.on_max_failures = proc do |job, ex|
+          job.should == @job
+          false
+        end
+        @job.should_not_receive(:destroy)
+        Delayed::Worker.max_attempts.times { @worker.reschedule(@job) }
+      end
+
+      it "should be destroyed if it failed max_attempts times and cb is true" do
+        Delayed::Worker.destroy_failed_jobs = true
+        Delayed::Worker.on_max_failures = proc do |job, ex|
+          job.should == @job
+          true
+        end
+        @job.should_receive(:destroy)
+        Delayed::Worker.max_attempts.times { @worker.reschedule(@job) }
+      end
+    end
   end
 
 
