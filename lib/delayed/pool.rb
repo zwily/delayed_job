@@ -27,7 +27,7 @@ module Delayed
       if GC.respond_to?(:copy_on_write_friendly=)
         GC.copy_on_write_friendly = true
       end
-      self.new("config/delayed_jobs.yml").daemonize
+      self.new(Rails.root+"config/delayed_jobs.yml").daemonize
     end
 
     def logger
